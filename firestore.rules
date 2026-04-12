@@ -1,0 +1,74 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function hasRole(role) {
+      return isAuthenticated() && getUserData().role == role;
+    }
+    
+    function isAdmin() {
+      return hasRole('Admin') || (request.auth.token.email == "persone00001@gmail.com" && request.auth.token.email_verified == true);
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // ===============================================================
+    // Validation Functions
+    // ===============================================================
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'role']) &&
+             data.role in ['Commercial', 'Coordinator', 'Logistics', 'Production', 'Admin'];
+    }
+
+    function isValidProject(data) {
+      return data.keys().hasAll(['title', 'type', 'quantity', 'deadline', 'status', 'createdBy']) &&
+             data.status in ['Created', 'Reviewed', 'Waiting Materials', 'Transferring', 'Ready', 'In Production', 'Finished'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role);
+    }
+
+    match /projects/{projectId} {
+      allow read: if isAuthenticated();
+      allow create: if hasRole('Commercial') || isAdmin();
+      allow update: if isAuthenticated(); // More granular checks in app logic, but rules allow status updates
+      allow delete: if isAdmin();
+    }
+
+    match /transfers/{transferId} {
+      allow read: if isAuthenticated();
+      allow create: if hasRole('Logistics') || isAdmin();
+      allow update: if hasRole('Logistics') || hasRole('Coordinator') || isAdmin();
+    }
+
+    match /messages/{messageId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+    }
+  }
+}

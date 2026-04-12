@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role and department",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["Commercial", "Coordinator", "Logistics", "Production", "Admin"] },
+        "department": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Product lifecycle instance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["Transformation", "Impression", "Finition"] },
+        "quantity": { "type": "integer" },
+        "unit": { "type": "string", "enum": ["kg", "feuille"] },
+        "deadline": { "type": "string", "format": "date-time" },
+        "clientName": { "type": "string" },
+        "status": { "type": "string", "enum": ["Created", "Reviewed", "Waiting Materials", "Transferring", "Ready", "In Production", "Finished"] },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "type", "quantity", "unit", "deadline", "status", "createdBy"]
+    },
+    "Transfer": {
+      "title": "Transfer",
+      "description": "Material transfer request",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string" },
+        "fromLocation": { "type": "string" },
+        "toLocation": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "done"] },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["projectId", "fromLocation", "toLocation", "status", "createdBy"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Chat message",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "projectId": { "type": "string" },
+        "department": { "type": "string" },
+        "content": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderId", "senderName", "content", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "System action log",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "entity": { "type": "string" },
+        "entityId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "action", "entity", "timestamp"]
+    }
+  },
+  "firestore": {
+    "users": { "schema": "User", "description": "User profiles" },
+    "projects": { "schema": "Project", "description": "Lifecycle projects" },
+    "transfers": { "schema": "Transfer", "description": "Material transfers" },
+    "messages": { "schema": "Message", "description": "Chat messages" },
+    "auditLogs": { "schema": "AuditLog", "description": "Audit trails" }
+  }
+}
