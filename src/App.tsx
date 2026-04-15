@@ -38,6 +38,7 @@ import {
   CheckCircle2, 
   Clock, 
   AlertCircle,
+  RefreshCw,
   Search,
   Filter,
   Send,
@@ -457,7 +458,7 @@ export default function App() {
       <header className="lg:hidden absolute top-0 left-0 right-0 h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 z-40">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-slate-900 rounded flex items-center justify-center">
-            <LayoutDashboard className="text-white" size={16} />
+            <RefreshCw className="text-white animate-spin-slow" size={16} />
           </div>
           <span className="text-lg font-bold tracking-tight">LifecyclePro</span>
         </div>
@@ -501,7 +502,7 @@ export default function App() {
         <div className="flex items-center justify-between lg:justify-start gap-2 px-2 mb-8">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-slate-900 rounded flex items-center justify-center">
-              <LayoutDashboard className="text-white" size={16} />
+              <RefreshCw className="text-white animate-spin-slow" size={16} />
             </div>
             <span className="text-lg font-bold tracking-tight">LifecyclePro</span>
           </div>
@@ -778,7 +779,7 @@ function AuthForm({ onLogin }: { onLogin: () => Promise<void> }) {
       className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-slate-100"
     >
       <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-slate-200">
-        <LayoutDashboard className="text-white" size={32} />
+        <RefreshCw className="text-white animate-spin-slow" size={32} />
       </div>
       <h1 className="text-2xl font-bold text-slate-900 mb-2 text-center">LifecyclePro</h1>
       <p className="text-slate-500 mb-8 text-center">Plateforme de suivi du cycle de vie des produits d'entreprise</p>
