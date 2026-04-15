@@ -44,7 +44,10 @@ import {
   FileText,
   History,
   Menu,
-  X
+  X,
+  Edit2,
+  Trash2,
+  ArrowLeft
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -168,6 +171,8 @@ export default function App() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ message: string, onConfirm: () => void } | null>(null);
   const [projectFilters, setProjectFilters] = useState({
     status: 'all',
     client: 'all',
@@ -178,6 +183,13 @@ export default function App() {
   useEffect(() => {
     setIsSidebarOpen(false);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   const handleNavigate = (tab: string, filters?: any) => {
     setActiveTab(tab);
@@ -379,28 +391,52 @@ export default function App() {
         entityId: projectId,
         timestamp: serverTimestamp()
       });
+      setNotification({ message: "Statut mis à jour avec succès", type: 'success' });
     } catch (error) {
       console.error("Error updating project status:", error);
-      alert("Failed to update status. Please check your permissions.");
+      setNotification({ message: "Échec de la mise à jour du statut. Vérifiez vos permissions.", type: 'error' });
     }
   };
 
-  const deleteProject = async (projectId: string) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce projet ?")) return;
+  const updateProject = async (projectId: string, data: Partial<Project>) => {
     try {
-      await deleteDoc(doc(db, 'projects', projectId));
+      await updateDoc(doc(db, 'projects', projectId), data);
       await addDoc(collection(db, 'auditLogs'), {
         userId: appUser?.uid,
-        action: `Projet supprimé`,
+        action: `Project updated`,
         entity: 'project',
         entityId: projectId,
         timestamp: serverTimestamp()
       });
-      setSelectedProject(null);
+      setNotification({ message: "Projet mis à jour avec succès", type: 'success' });
     } catch (error) {
-      console.error("Error deleting project:", error);
-      alert("Échec de la suppression du projet.");
+      console.error("Error updating project:", error);
+      setNotification({ message: "Échec de la mise à jour du projet.", type: 'error' });
     }
+  };
+
+  const deleteProject = async (projectId: string) => {
+    setConfirmModal({
+      message: "Êtes-vous sûr de vouloir supprimer ce projet ?",
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'projects', projectId));
+          await addDoc(collection(db, 'auditLogs'), {
+            userId: appUser?.uid,
+            action: `Projet supprimé`,
+            entity: 'project',
+            entityId: projectId,
+            timestamp: serverTimestamp()
+          });
+          setSelectedProject(null);
+          setNotification({ message: "Projet supprimé avec succès", type: 'success' });
+        } catch (error) {
+          console.error("Error deleting project:", error);
+          setNotification({ message: "Échec de la suppression du projet.", type: 'error' });
+        }
+        setConfirmModal(null);
+      }
+    });
   };
 
   if (loading || (user && !appUser)) return (
@@ -565,6 +601,7 @@ export default function App() {
             appUser={appUser!} 
             onClose={() => setSelectedProject(null)}
             onUpdateStatus={updateProjectStatus}
+            onUpdateProject={updateProject}
             onDelete={deleteProject}
           />
         )}
@@ -577,6 +614,58 @@ export default function App() {
           appUser={appUser!} 
         />
       )}
+
+      {/* Notifications */}
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className={cn(
+              "fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl z-[200] flex items-center gap-3 font-bold text-sm",
+              notification.type === 'success' ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
+            )}
+          >
+            {notification.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+            {notification.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirm Modal */}
+      <AnimatePresence>
+        {confirmModal && (
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-6"
+            >
+              <div className="flex items-center gap-3 text-amber-600">
+                <AlertCircle size={24} />
+                <h3 className="text-lg font-bold">Confirmation</h3>
+              </div>
+              <p className="text-slate-600 text-sm leading-relaxed">{confirmModal.message}</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmModal(null)}
+                  className="flex-1 px-4 py-2 border border-slate-200 rounded-lg font-bold hover:bg-slate-50 transition-all text-sm"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={confirmModal.onConfirm}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-all text-sm"
+                >
+                  Confirmer
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1371,10 +1460,11 @@ function UsersManagementView() {
 
 // --- Modals & Panels ---
 
-function ProjectDetailPanel({ project, appUser, onClose, onUpdateStatus, onDelete }: { project: Project, appUser: AppUser, onClose: () => void, onUpdateStatus: any, onDelete: any }) {
+function ProjectDetailPanel({ project, appUser, onClose, onUpdateStatus, onUpdateProject, onDelete }: { project: Project, appUser: AppUser, onClose: () => void, onUpdateStatus: any, onUpdateProject: any, onDelete: any }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     const q = query(
@@ -1455,6 +1545,24 @@ function ProjectDetailPanel({ project, appUser, onClose, onUpdateStatus, onDelet
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">ID du projet: {project.id.slice(0, 8)}</p>
         </div>
         <div className="flex items-center gap-2">
+          {appUser.role === 'Admin' && (
+            <>
+              <button 
+                onClick={() => setIsEditing(true)}
+                className="p-1.5 hover:bg-blue-100 text-blue-600 rounded transition-colors"
+                title="Modifier le projet"
+              >
+                <Edit2 size={16} />
+              </button>
+              <button 
+                onClick={() => onDelete(project.id)}
+                className="p-1.5 hover:bg-red-100 text-red-600 rounded transition-colors"
+                title="Supprimer le projet"
+              >
+                <Trash2 size={16} />
+              </button>
+            </>
+          )}
           <button onClick={onClose} className="p-1.5 hover:bg-slate-200 rounded transition-colors">
             <Plus className="rotate-45 text-slate-500" size={18} />
           </button>
@@ -1486,18 +1594,33 @@ function ProjectDetailPanel({ project, appUser, onClose, onUpdateStatus, onDelet
                     </div>
                     <div className="flex-1 pt-0.5">
                       <p className={cn("text-xs font-bold", isCurrent ? "text-slate-900" : "text-slate-500")}>{translations[step] || step}</p>
-                      {isCurrent && isAllowedToMove && idx < STATUS_STEPS.length - 1 && (
-                        <div className="mt-2">
-                          <button 
-                            disabled={isUpdating}
-                            onClick={() => handleStatusUpdate(nextStep as Project['status'])}
-                            className={cn(
-                              "text-[10px] bg-slate-900 text-white px-2.5 py-1 rounded font-bold hover:bg-slate-800 transition-all uppercase tracking-wider",
-                              isUpdating && "opacity-50 cursor-not-allowed"
-                            )}
-                          >
-                            {isUpdating ? "Mise à jour..." : `Passer à ${translations[nextStep] || nextStep}`}
-                          </button>
+                      {isCurrent && isAllowedToMove && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {idx < STATUS_STEPS.length - 1 && (
+                            <button 
+                              disabled={isUpdating}
+                              onClick={() => handleStatusUpdate(STATUS_STEPS[idx + 1] as Project['status'])}
+                              className={cn(
+                                "text-[10px] bg-slate-900 text-white px-2.5 py-1 rounded font-bold hover:bg-slate-800 transition-all uppercase tracking-wider",
+                                isUpdating && "opacity-50 cursor-not-allowed"
+                              )}
+                            >
+                              {isUpdating ? "Mise à jour..." : `Passer à ${translations[STATUS_STEPS[idx + 1]] || STATUS_STEPS[idx + 1]}`}
+                            </button>
+                          )}
+                          {appUser.role === 'Admin' && idx > 0 && (
+                            <button 
+                              disabled={isUpdating}
+                              onClick={() => handleStatusUpdate(STATUS_STEPS[idx - 1] as Project['status'])}
+                              className={cn(
+                                "text-[10px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded font-bold hover:bg-slate-200 transition-all uppercase tracking-wider flex items-center gap-1",
+                                isUpdating && "opacity-50 cursor-not-allowed"
+                              )}
+                            >
+                              <ArrowLeft size={10} />
+                              {isUpdating ? "Mise à jour..." : `Retour à ${translations[STATUS_STEPS[idx - 1]] || STATUS_STEPS[idx - 1]}`}
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1551,7 +1674,138 @@ function ProjectDetailPanel({ project, appUser, onClose, onUpdateStatus, onDelet
           </form>
         </div>
       </div>
+
+      {isEditing && (
+        <EditProjectModal 
+          project={project} 
+          onClose={() => setIsEditing(false)} 
+          onSave={(data) => {
+            onUpdateProject(project.id, data);
+            setIsEditing(false);
+          }} 
+        />
+      )}
     </motion.div>
+  );
+}
+
+function EditProjectModal({ project, onClose, onSave }: { project: Project, onClose: () => void, onSave: (data: Partial<Project>) => void }) {
+  const [formData, setFormData] = useState({
+    title: project.title,
+    description: project.description,
+    type: project.type,
+    quantity: project.quantity,
+    unit: project.unit,
+    deadline: project.deadline,
+    clientName: project.clientName
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+      >
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="text-xl font-bold">Modifier le projet</h3>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+            <Plus className="rotate-45 text-slate-400" size={24} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-500 uppercase">Titre du projet</label>
+            <input 
+              required
+              type="text" 
+              className="w-full px-4 py-2 bg-slate-50 border-none rounded-lg focus:ring-2 focus:ring-slate-900"
+              value={formData.title}
+              onChange={e => setFormData({...formData, title: e.target.value})}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-500 uppercase">Quantité et Type d'unité</label>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input 
+                type="number" 
+                required
+                className="flex-1 px-4 py-2 bg-slate-50 border-none rounded-lg focus:ring-2 focus:ring-slate-900"
+                value={formData.quantity}
+                onChange={e => setFormData({...formData, quantity: parseInt(e.target.value) || 0})}
+              />
+              <select 
+                className="flex-1 px-4 py-2 bg-slate-50 border-none rounded-lg focus:ring-2 focus:ring-slate-900 text-xs font-bold"
+                value={`${formData.type}:${formData.unit}`}
+                onChange={e => {
+                  const [type, unit] = e.target.value.split(':');
+                  setFormData({
+                    ...formData, 
+                    type: type as Project['type'], 
+                    unit: unit
+                  });
+                }}
+              >
+                <option value="Transformation:kg">Transformation (kg)</option>
+                <option value="Impression:feuille">Impression (feuille)</option>
+                <option value="Finition:kg">Finition (kg)</option>
+                <option value="Finition:feuille">Finition (feuille)</option>
+              </select>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-500 uppercase">Nom du client</label>
+            <input 
+              required
+              type="text" 
+              className="w-full px-4 py-2 bg-slate-50 border-none rounded-lg focus:ring-2 focus:ring-slate-900"
+              value={formData.clientName}
+              onChange={e => setFormData({...formData, clientName: e.target.value})}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-500 uppercase">Date limite</label>
+            <input 
+              required
+              type="date" 
+              className="w-full px-4 py-2 bg-slate-50 border-none rounded-lg focus:ring-2 focus:ring-slate-900"
+              value={formData.deadline}
+              onChange={e => setFormData({...formData, deadline: e.target.value})}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-500 uppercase">Description</label>
+            <textarea 
+              required
+              rows={3}
+              className="w-full px-4 py-2 bg-slate-50 border-none rounded-lg focus:ring-2 focus:ring-slate-900 resize-none"
+              value={formData.description}
+              onChange={e => setFormData({...formData, description: e.target.value})}
+            />
+          </div>
+          <div className="pt-4 flex gap-3">
+            <button 
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-6 py-3 border border-slate-200 rounded-xl font-bold hover:bg-slate-50 transition-all"
+            >
+              Annuler
+            </button>
+            <button 
+              type="submit"
+              className="flex-1 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all"
+            >
+              Enregistrer les modifications
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
   );
 }
 
